@@ -56,7 +56,10 @@ namespace Loading
         private readonly List<MatrixColumn> _matrixColumns = new List<MatrixColumn>();
         private readonly List<MatrixColumn> _matrixColumns2 = new List<MatrixColumn>();
         private const int MatrixColumnCount = 8;
-
+        private int _reconnectAttempts = 0;
+        private const int MaxReconnectAttempts = 50;
+        private readonly List<MatrixColumn> _backgroundMatrixColumns = new List<MatrixColumn>();
+        private const int BackgroundMatrixColumnCount = 24; // More columns for the background
 
         public MainWindow()
         {
@@ -108,23 +111,35 @@ namespace Loading
 
         private void InitializeMatrixEffect()
         {
-            // Create matrix columns for the first canvas
+            // Create columns for regular matrix (keeping for backward compatibility)
             for (int i = 0; i < MatrixColumnCount; i++)
             {
                 var column = new MatrixColumn
                 {
-                    Speed = _matrixRandom.NextDouble() * 3 + 2,  // Speed between 2-5
-                    Position = _matrixRandom.NextDouble() * -150, // Start above visible area
-                    Length = _matrixRandom.Next(8, 20)           // Slightly shorter columns for better performance
+                    Speed = _matrixRandom.NextDouble() * 4 + 3, // Increased speed from 3+2 to 4+3
+                    Position = _matrixRandom.NextDouble() * -150,
+                    Length = _matrixRandom.Next(8, 20)
                 };
                 _matrixColumns.Add(column);
+            }
+
+            // Create columns for background matrix (more columns, wider spread)
+            for (int i = 0; i < BackgroundMatrixColumnCount; i++)
+            {
+                var column = new MatrixColumn
+                {
+                    Speed = _matrixRandom.NextDouble() * 3 + 2,  // Increased speed from 2+1 to 3+2
+                    Position = _matrixRandom.NextDouble() * -200,
+                    Length = _matrixRandom.Next(8, 30)  // Longer trails for background
+                };
+                _backgroundMatrixColumns.Add(column);
             }
 
             // Set up the timer for animation with high priority
             _matrixTimer = new System.Windows.Threading.DispatcherTimer(
                 System.Windows.Threading.DispatcherPriority.Render)
             {
-                Interval = TimeSpan.FromMilliseconds(60)  // 40ms for smoother animation
+                Interval = TimeSpan.FromMilliseconds(30) // Changed from 60ms to 40ms for faster animation
             };
             _matrixTimer.Tick += MatrixTimer_Tick;
             _matrixTimer.Start();
@@ -132,10 +147,123 @@ namespace Loading
 
         private void MatrixTimer_Tick(object sender, EventArgs e)
         {
-            // Use BeginInvoke to avoid blocking the UI thread
+            // Use BeginInvoke to avoid blocking the UI thread with low priority 
+            // Changed from Background to ContextIdle for smoother animation
             Dispatcher.BeginInvoke(() => {
-                UpdateMatrixCanvas(MatrixCanvas, _matrixColumns);
-            }, System.Windows.Threading.DispatcherPriority.Background);
+                // Update the regular matrix (mostly for backward compatibility)
+                if (MatrixCanvas.Visibility == Visibility.Visible)
+                {
+                    UpdateMatrixCanvas(MatrixCanvas, _matrixColumns);
+                }
+
+                // Update the background matrix
+                if (BackgroundMatrixCanvas != null)
+                {
+                    UpdateBackgroundMatrixCanvas(BackgroundMatrixCanvas, _backgroundMatrixColumns);
+                }
+            }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        }
+
+        private void UpdateBackgroundMatrixCanvas(Canvas canvas, List<MatrixColumn> columns)
+        {
+            if (canvas.ActualWidth < 1 || canvas.ActualHeight < 1)
+                return; // Don't update if canvas isn't properly sized yet
+
+            // Matrix character set
+            char[] matrixChars = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ1234567890".ToCharArray();
+
+            // Cache dimensions
+            double canvasWidth = canvas.ActualWidth;
+            double canvasHeight = canvas.ActualHeight;
+
+            // Cap the maximum number of characters per column
+            int maxCharsPerColumn = 30; // Reduced from 40 to 30 for better performance
+
+            // Process columns evenly across the canvas width
+            int columnsToProcess = Math.Min(12, columns.Count); // Process more columns per frame
+            int step = Math.Max(1, columns.Count / columnsToProcess);
+
+            // Process evenly distributed columns
+            for (int i = 0; i < columns.Count; i += step)
+            {
+                var column = columns[i];
+                double x = i * (canvasWidth / columns.Count);
+
+                // Update position with consistent speed
+                column.Position += column.Speed;
+
+                // Reset column if it's gone too far
+                if (column.Position > canvasHeight + 50)
+                {
+                    column.Position = _matrixRandom.NextDouble() * -150;
+                    column.Speed = _matrixRandom.NextDouble() * 3 + 2;
+                    column.Length = _matrixRandom.Next(8, 25); // Slightly reduced max length
+
+                    // Remove all characters in this column
+                    foreach (var charBlock in column.Characters)
+                    {
+                        canvas.Children.Remove(charBlock);
+                    }
+                    column.Characters.Clear();
+                }
+
+                // Add new character at top with more controlled frequency
+                if (column.Characters.Count < column.Length &&
+                    column.Characters.Count < maxCharsPerColumn &&
+                    _matrixRandom.NextDouble() < 0.35) // Increased probability for more consistent character addition
+                {
+                    TextBlock textBlock = new TextBlock
+                    {
+                        Text = matrixChars[_matrixRandom.Next(matrixChars.Length)].ToString(),
+                        FontFamily = new FontFamily("Consolas"),
+                        FontSize = 11,
+                        Foreground = new SolidColorBrush(Color.FromArgb(100, 0, 255, 0)),
+                        TextAlignment = TextAlignment.Center,
+                        Opacity = 0.6
+                    };
+
+                    // Make first character brighter
+                    if (column.Characters.Count == 0)
+                    {
+                        textBlock.Foreground = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255));
+                        textBlock.Opacity = 0.8;
+                    }
+
+                    Canvas.SetLeft(textBlock, x);
+                    Canvas.SetTop(textBlock, column.Position - 15);
+                    canvas.Children.Add(textBlock);
+                    column.Characters.Add(textBlock);
+                }
+
+                // Update positions of existing characters with more efficient loop
+                for (int j = 0; j < column.Characters.Count; j++)
+                {
+                    var textBlock = column.Characters[j];
+                    double yPos = column.Position - (j * 15);
+
+                    // Set position
+                    Canvas.SetTop(textBlock, yPos);
+
+                    // Remove characters that have gone too far down
+                    if (yPos > canvasHeight + 30)
+                    {
+                        canvas.Children.Remove(textBlock);
+                        column.Characters.RemoveAt(j);
+                        j--;
+                    }
+                }
+            }
+
+            // More efficient cleanup strategy
+            if (_matrixRandom.NextDouble() < 0.05 && canvas.Children.Count > 350)
+            {
+                int elementsToRemove = canvas.Children.Count - 350;
+                for (int i = 0; i < Math.Min(elementsToRemove, 25); i++)
+                {
+                    if (canvas.Children.Count > 0)
+                        canvas.Children.RemoveAt(0);
+                }
+            }
         }
 
         private void UpdateMatrixCanvas(Canvas canvas, List<MatrixColumn> columns)
@@ -255,9 +383,14 @@ namespace Loading
                 _matrixTimer = null;
             }
 
-            if (MatrixCanvas != null)
+            if (MatrixCanvas != null && MatrixCanvas.Visibility == Visibility.Visible)
             {
                 MatrixCanvas.Children.Clear();
+            }
+
+            if (BackgroundMatrixCanvas != null)
+            {
+                BackgroundMatrixCanvas.Children.Clear();
             }
 
             if (MatrixCanvas2 != null && MatrixCanvas2.Visibility == Visibility.Visible)
@@ -267,6 +400,7 @@ namespace Loading
 
             _matrixColumns.Clear();
             _matrixColumns2.Clear();
+            _backgroundMatrixColumns.Clear();
 
             // Force garbage collection
             GC.Collect();
@@ -402,43 +536,92 @@ namespace Loading
         {
             try
             {
-                while (_isAutoReconnectEnabled)
+                _reconnectAttempts++;
+
+                // If we've reached max attempts, add longer delays for the next attempts
+                if (_reconnectAttempts >= MaxReconnectAttempts)
                 {
-                    client?.Close();
-                    client = new TcpClient
+                    // Reset counter and take a longer break
+                    LogMessage($"* Maximum reconnection attempts reached ({MaxReconnectAttempts}). Taking a longer break... *", Colors.Red);
+                    await Task.Delay(30000); // 30 second break before retrying
+                    _reconnectAttempts = 0;
+
+                    // Temporarily disable ban mode if it was active
+                    if (isBanAllActive)
                     {
-                        ReceiveTimeout = 10000,
-                        SendTimeout = 10000
-                    };
-
-                    int delayMs = BaseReconnectDelay + _random.Next(ReconnectScatter);
-                    LogMessage($"* Attempting to reconnect in {delayMs}ms...", Colors.Red);
-
-                    try
-                    {
-                        await Task.Delay(delayMs, _reconnectCancellation?.Token ?? CancellationToken.None);
-                        await client.ConnectAsync(serverAddress, serverPort);
-                        stream = client.GetStream();
-                        await SendLoginAsync(username!, password!, homeChannel);
-                        _ = ListenForMessages();
-                        _ = KeepConnectionAlive();
-
-                        if (client.Connected)
-                        {
-                            LogMessage("* Successfully reconnected", Colors.Red);
-                            await RequestUserListAsync();
-                            break;
-                        }
+                        bool wasActive = isBanAllActive;
+                        isBanAllActive = false;
+                        LogMessage("* Ban mode temporarily disabled during reconnection *", Colors.Yellow);
                     }
-                    catch (OperationCanceledException)
+                }
+
+                // Calculate backoff delay - longer delays after more failures
+                int baseDelay = BaseReconnectDelay;
+                int backoffFactor = Math.Min(10, Math.Max(1, _reconnectAttempts / 5));
+                int delayMs = baseDelay * backoffFactor + _random.Next(ReconnectScatter);
+
+                LogMessage($"* Reconnection attempt {_reconnectAttempts}: Waiting {delayMs}ms... *", Colors.Red);
+
+                // Clean up existing connection
+                client?.Close();
+                client = new TcpClient
+                {
+                    ReceiveTimeout = 10000,
+                    SendTimeout = 10000
+                };
+
+                try
+                {
+                    await Task.Delay(delayMs, _reconnectCancellation?.Token ?? CancellationToken.None);
+
+                    // Since we had disconnect issues, add some guard time between attempts
+                    await Task.Delay(100);
+
+                    // Connect and login
+                    await client.ConnectAsync(serverAddress, serverPort);
+                    stream = client.GetStream();
+
+                    // Clear any pending message buffer
+                    messageBuffer.Clear();
+
+                    // Send login info
+                    await SendLoginAsync(username!, password!, homeChannel);
+
+                    // Start listening and keepalive
+                    _ = ListenForMessages();
+                    _ = KeepConnectionAlive();
+
+                    if (client.Connected)
                     {
-                        LogMessage("* Reconnection cancelled", Colors.Red);
-                        break;
+                        // Reset attempts on successful connection
+                        _reconnectAttempts = 0;
+                        LogMessage("* Successfully reconnected", Colors.Green);
+
+                        // Wait before requesting user list
+                        await Task.Delay(1000);
+                        await RequestUserListAsync();
+
+                        // Reset connection-related state
+                        _isReconnecting = false;
+
+                        // Return to avoid looping again
+                        return;
                     }
-                    catch (Exception ex)
+                }
+                catch (OperationCanceledException)
+                {
+                    LogMessage("* Reconnection cancelled", Colors.Red);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"* Reconnection attempt {_reconnectAttempts} failed: {ex.Message}", Colors.Red);
+
+                    // If we have connection issues, retry with HandleReconnection again after a short delay
+                    if (_isAutoReconnectEnabled)
                     {
-                        LogMessage($"* Reconnection attempt failed: {ex.Message}", Colors.Red);
-                        //await Task.Delay(100);
+                        await Task.Delay(100);
+                        await HandleReconnection();
                     }
                 }
             }
@@ -970,6 +1153,15 @@ namespace Loading
                 }
             }
 
+            if (message.Equals($"{_commandTrigger}reset", StringComparison.OrdinalIgnoreCase))
+            {
+                if (senderUsername == _masterUsername)
+                {
+                    await ResetConnectionState();
+                    return true;
+                }
+            }
+
             if (message.StartsWith($"{_commandTrigger}say ", StringComparison.OrdinalIgnoreCase))
             {
                 if (senderUsername == _masterUsername)
@@ -1269,10 +1461,14 @@ namespace Loading
         {
             try
             {
+
+                await Task.Delay(2000);
+
                 // Check operator status before starting
                 if (!IsCurrentUserOperator())
                 {
-                    await DisableBanMode("Not an operator");
+                    LogMessage("* Not an operator, temporarily disabling mass ban mode until operator status is acquired *", Colors.Red);
+                    isBanAllActive = false;
                     return;
                 }
 
@@ -2002,7 +2198,94 @@ namespace Loading
             }
         }
 
-        
+
+        private async Task ResetConnectionState()
+        {
+            try
+            {
+                // Log the reset
+                LogMessage("* Resetting connection state *", Colors.Yellow);
+
+                // Ensure auto-reconnect is disabled during reset
+                _isAutoReconnectEnabled = false;
+
+                // Reset all connection-related state variables
+                _isReconnecting = false;
+                _reconnectAttempts = 0;
+
+                // If we were in ban mode, temporarily disable it
+                bool wasBanActive = isBanAllActive;
+                if (isBanAllActive)
+                {
+                    isBanAllActive = false;
+                    LogMessage("* Ban mode temporarily disabled during connection reset *", Colors.Yellow);
+                }
+
+                // Clear any pending messages
+                lock (messageLock)
+                {
+                    messageQueue.Clear();
+                    isProcessingMessages = false;
+                    messageBuffer.Clear();
+                }
+
+                // Full disconnect
+                var localStream = stream;
+                var localClient = client;
+
+                stream = null;
+                client = null;
+
+                if (localStream != null)
+                {
+                    try
+                    {
+                        await localStream.DisposeAsync();
+                    }
+                    catch { /* Ignore errors during cleanup */ }
+                }
+
+                if (localClient != null)
+                {
+                    try
+                    {
+                        localClient.Close();
+                    }
+                    catch { /* Ignore errors during cleanup */ }
+                }
+
+                // Clear UI elements
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    UserList.Items.Clear();
+                    PingDisplay.Text = "-- ms";
+                    PingDisplay.Foreground = new SolidColorBrush(Colors.LimeGreen);
+                });
+
+                // Delay before attempting new connection
+                await Task.Delay(5000);
+
+                // Try to connect again
+                _isAutoReconnectEnabled = true;
+                _reconnectAttempts = 0;
+                await ConnectToServerAsync(username!, password!);
+
+                // Restore ban mode if it was active
+                if (wasBanActive && IsCurrentUserOperator())
+                {
+                    LogMessage("* Restoring ban mode after connection reset *", Colors.Yellow);
+                    isBanAllActive = true;
+                }
+
+                LogMessage("* Connection state reset complete *", Colors.Green);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"* Error during connection reset: {ex.Message} *", Colors.Red);
+                // Re-enable auto-reconnect in case of error
+                _isAutoReconnectEnabled = true;
+            }
+        }
 
         public class ChatUser
         {

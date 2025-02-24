@@ -6,6 +6,14 @@
         FontFamily="Consolas"
         Closing="MainWindow_Closing">
     <Window.Resources>
+        <!-- Define common colors as resources -->
+        <Color x:Key="MatrixGreen">#00FF00</Color>
+        <Color x:Key="MatrixLightGreen">#33FF00</Color>
+        <Color x:Key="HoverBackground">#3F00FF00</Color>
+        <!-- Consistent hover color -->
+        <Color x:Key="PressedBackground">#6600FF00</Color>
+        <!-- Consistent pressed color -->
+
         <Style x:Key="MatrixTextBlock" TargetType="{x:Type TextBlock}">
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="Foreground" Value="#00FF00"/>
@@ -21,7 +29,6 @@
 
         <Style x:Key="CyberpunkScrollBar" TargetType="{x:Type ScrollBar}">
             <Setter Property="Background" Value="#FF00FF00"/>
-            <!-- Matrix green -->
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ScrollBar}">
@@ -56,7 +63,6 @@
         <Style x:Key="CyberpunkListBoxItem" TargetType="{x:Type ListBoxItem}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#FF00FF00"/>
-            <!-- Matrix green -->
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ListBoxItem}">
@@ -71,14 +77,13 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#33FF00FF"/>
-                                <!-- Semi-transparent matrix green for hover -->
+                                <Setter Property="Background" Value="#3F00FF00"/>
+                                <!-- Using the consistent hover color -->
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
-                                <!-- White text on hover -->
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#66FF00FF"/>
-                                <!-- More opaque matrix green for selection -->
+                                <Setter Property="Background" Value="#6600FF00"/>
+                                <!-- Using the consistent pressed color -->
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -87,18 +92,17 @@
             </Setter>
         </Style>
 
+        <!-- Updated button style to match hover effect of user list -->
         <Style x:Key="CyberpunkButton" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#0CFF00"/>
-            <!-- Slightly brighter green -->
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Margin" Value="2"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <!-- Make text bold -->
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect Color="#0CFF00" BlurRadius="5" ShadowDepth="0" Opacity="0.5"/>
+                    <DropShadowEffect Color="#0CFF00" BlurRadius="3" ShadowDepth="0" Opacity="0.4"/>
                 </Setter.Value>
             </Setter>
             <Setter Property="Template">
@@ -109,9 +113,9 @@
                                 Background="{TemplateBinding Background}" 
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="5">
+                                CornerRadius="3">
                                 <!-- Semi-transparent background panel for better text visibility -->
-                                <Border Background="#15000000" CornerRadius="4" Margin="0">
+                                <Border Background="#10000000" CornerRadius="3" Margin="0">
                                     <ContentPresenter HorizontalAlignment="Center" 
                                             VerticalAlignment="Center"
                                             Margin="{TemplateBinding Padding}"/>
@@ -121,23 +125,38 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="#3F00FF00"/>
+                                <!-- Using the consistent hover color -->
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                                 <Setter Property="Effect">
                                     <Setter.Value>
-                                        <DropShadowEffect Color="#0CFF00" BlurRadius="8" ShadowDepth="0" Opacity="0.8"/>
+                                        <DropShadowEffect Color="#0CFF00" BlurRadius="5" ShadowDepth="0" Opacity="0.7"/>
                                     </Setter.Value>
                                 </Setter>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="#6600FF00"/>
+                                <!-- Using the consistent pressed color -->
                                 <Setter Property="Effect">
                                     <Setter.Value>
-                                        <DropShadowEffect Color="#0CFF00" BlurRadius="10" ShadowDepth="0" Opacity="1.0"/>
+                                        <DropShadowEffect Color="#0CFF00" BlurRadius="7" ShadowDepth="0" Opacity="0.8"/>
                                     </Setter.Value>
                                 </Setter>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Add blur effect for panels -->
+        <Style x:Key="TranslucentPanel" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="#881A1A1A"/>
+            <Setter Property="BorderBrush" Value="#33008800"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <BlurEffect Radius="1" RenderingBias="Performance"/>
                 </Setter.Value>
             </Setter>
         </Style>
@@ -154,11 +173,18 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="1*" MinHeight="100" />
             <RowDefinition Height="Auto" />
-            <!-- For input box -->
         </Grid.RowDefinitions>
 
+        <!-- Background Matrix Canvas for full-window matrix effect -->
+        <Canvas x:Name="BackgroundMatrixCanvas" 
+                Grid.Row="0" Grid.RowSpan="4" 
+                Grid.Column="0" Grid.ColumnSpan="3" 
+                Panel.ZIndex="-10" 
+                ClipToBounds="True"
+                Background="Transparent"/>
+
         <!-- Left side panel with Matrix animation -->
-        <Grid Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" Background="#0D0D0D">
+        <Grid Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" Background="Transparent">
             <!-- Matrix Canvas underneath everything -->
             <Canvas x:Name="MatrixCanvas" 
                     Width="100" 
@@ -168,7 +194,7 @@
                     Panel.ZIndex="0"/>
 
             <!-- Buttons panel with improved visibility -->
-            <Border Background="#22000000" CornerRadius="5" Margin="5,40,5,5" Panel.ZIndex="5">
+            <Border Background="#66000000" CornerRadius="5" Margin="5,40,5,5" Panel.ZIndex="5" BorderThickness="0">
                 <StackPanel Margin="0" VerticalAlignment="Top" Panel.ZIndex="10">
                     <Button x:Name="ConnectButton" 
                             Content="Connect" 
@@ -225,7 +251,7 @@
                     Height="1" />
 
             <!-- Ping Display at the bottom -->
-            <Border Background="#22000000" CornerRadius="5" Margin="5" Panel.ZIndex="5" VerticalAlignment="Bottom">
+            <Border Background="#66000000" CornerRadius="5" Margin="5" Panel.ZIndex="5" VerticalAlignment="Bottom" BorderThickness="0">
                 <TextBlock x:Name="PingDisplay"
                            Margin="5"
                            FontFamily="Consolas"
@@ -239,15 +265,15 @@
         </Grid>
 
         <!-- Chat Display Section -->
-        <Border Grid.Row="0" Grid.Column="1" Margin="10" Background="#1A1A1A" CornerRadius="10">
+        <Border Grid.Row="0" Grid.Column="1" Margin="10" Style="{StaticResource TranslucentPanel}">
             <Border.Effect>
-                <DropShadowEffect Color="#00FF00" BlurRadius="10" ShadowDepth="0" />
+                <DropShadowEffect Color="#00FF00" BlurRadius="5" ShadowDepth="0" Opacity="0.3" />
             </Border.Effect>
             <RichTextBox x:Name="rtbChat" 
                  Margin="10" 
                  IsReadOnly="True"
                  VerticalScrollBarVisibility="Auto"
-                 Background="#1A1A1A" 
+                 Background="#661A1A1A" 
                  Foreground="#00FF00" 
                  BorderThickness="0">
                 <RichTextBox.Resources>
@@ -269,17 +295,17 @@
         <!-- GridSplitter for resizing whispers section -->
         <GridSplitter Grid.Row="1" 
               Grid.Column="1" 
-              Height="8"
+              Height="6"
               HorizontalAlignment="Stretch"
               VerticalAlignment="Center"
-              Background="#1A1A1A"
+              Background="#661A1A1A"
               Margin="10,0,10,0"
-              BorderThickness="1"
+              BorderThickness="0"
               Cursor="SizeNS">
             <GridSplitter.Template>
                 <ControlTemplate TargetType="{x:Type GridSplitter}">
                     <Border x:Name="PART_Border"
-                    Background="#00FF00"
+                    Background="#4400FF00"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     Opacity="0.7"
@@ -309,7 +335,9 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="PART_Border" Property="Opacity" Value="1.0"/>
-                            <Setter Property="Height" Value="10"/>
+                            <Setter TargetName="PART_Border" Property="Background" Value="#3F00FF00"/>
+                            <!-- Using the consistent hover color -->
+                            <Setter Property="Height" Value="8"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -317,13 +345,13 @@
         </GridSplitter>
 
         <!-- Whispers Display Section -->
-        <Border Grid.Row="2" Grid.Column="1" Margin="10,0,10,10" Background="#1A1A1A" CornerRadius="10">
+        <Border Grid.Row="2" Grid.Column="1" Margin="10,0,10,10" Style="{StaticResource TranslucentPanel}">
             <Border.Effect>
-                <DropShadowEffect Color="#00FF00" BlurRadius="10" ShadowDepth="0" />
+                <DropShadowEffect Color="#00FF00" BlurRadius="5" ShadowDepth="0" Opacity="0.3" />
             </Border.Effect>
             <DockPanel>
                 <Grid DockPanel.Dock="Top" Margin="5">
-                    <Border Background="#333333" CornerRadius="5">
+                    <Border Background="#44333333" CornerRadius="5" BorderThickness="0">
                         <TextBlock Text="Whispers" 
                                  Foreground="#00FFFF" 
                                  FontWeight="Bold" 
@@ -335,7 +363,7 @@
                          Margin="10" 
                          IsReadOnly="True"
                          VerticalScrollBarVisibility="Auto"
-                         Background="#1A1A1A" 
+                         Background="#661A1A1A" 
                          Foreground="#00FFFF" 
                          BorderThickness="0">
                     <RichTextBox.Resources>
@@ -356,20 +384,20 @@
         </Border>
 
         <!-- User List Section -->
-        <Border Grid.Row="0" Grid.Column="2" Grid.RowSpan="4" Margin="10" Background="#1A1A1A" CornerRadius="10">
+        <Border Grid.Row="0" Grid.Column="2" Grid.RowSpan="4" Margin="10" Style="{StaticResource TranslucentPanel}">
             <Border.Effect>
-                <DropShadowEffect Color="#00FF00" BlurRadius="10" ShadowDepth="0" />
+                <DropShadowEffect Color="#00FF00" BlurRadius="5" ShadowDepth="0" Opacity="0.3" />
             </Border.Effect>
             <DockPanel>
                 <Grid DockPanel.Dock="Top" Margin="5">
-                    <Border Background="#333333" CornerRadius="5">
+                    <Border Background="#44333333" CornerRadius="5" BorderThickness="0">
                         <TextBlock x:Name="ChannelInfo" Foreground="#00FF00" 
                                  FontWeight="Bold" Margin="10,5" 
                                  TextAlignment="Center"/>
                     </Border>
                 </Grid>
                 <ListBox x:Name="UserList" 
-                         Background="#1A1A1A" 
+                         Background="#661A1A1A" 
                          Foreground="#00FF00" 
                          Margin="10"
                          BorderThickness="0"
@@ -393,23 +421,21 @@
         </Border>
 
         <!-- Message Input and Send -->
-                    <!-- Message Input and Send -->
         <Grid Grid.Row="3" Grid.Column="1" Margin="10,5,10,10">
-                <Border Background="#1A1A1A"
-            CornerRadius="5" 
+            <Border Style="{StaticResource TranslucentPanel}" 
             HorizontalAlignment="Stretch">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#00FF00" BlurRadius="10" ShadowDepth="0" />
-                    </Border.Effect>
-                    <TextBox x:Name="UserInput" 
+                <Border.Effect>
+                    <DropShadowEffect Color="#00FF00" BlurRadius="5" ShadowDepth="0" Opacity="0.3" />
+                </Border.Effect>
+                <TextBox x:Name="UserInput" 
                  Margin="5"     
-                 Background="#1A1A1A" 
+                 Background="#661A1A1A" 
                  Foreground="#00FF00" 
                  BorderThickness="0" 
                  KeyDown="UserInput_KeyDown"
                  HorizontalAlignment="Stretch" />
-                </Border>
-                <Button Grid.Column="1" 
+            </Border>
+            <Button Grid.Column="1" 
             Content="Send" 
             Width="80" 
             Height="30"
