@@ -1,0 +1,15 @@
+﻿<UserControl x:Class="Loading.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Loading">
+  <Grid>
+    <StackPanel>
+      <TextBox x:Name="UsernameEntry" PlaceholderText="Username" />
+      <PasswordBox x:Name="PasswordEntry" PlaceholderText="Password" />
+      <TextBox x:Name="HomeEntry" PlaceholderText="Home" />
+      <TextBox x:Name="HostEntry" PlaceholderText="Host" />
+      <TextBox x:Name="PortEntry" PlaceholderText="Port" />
+      <Button Content="Save" Click="OnSaveClicked" />
+    </StackPanel>
+  </Grid>
+</UserControl>
